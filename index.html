@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * { box-sizing: border-box !important; }
+        body { 
+            background-color: #ffffff !important; 
+            margin: 0; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif !important;
+            padding: 5px 0;
+            zoom: 0.9;
+        }
+        .header-wrapper { display: flex; align-items: center; margin-bottom: 8px; width: 250px; }
+        #tabContainer { display: flex; gap: 4px; flex-wrap: wrap; }
+        .tab { 
+            background: #f0f0f0 !important; color: #666666 !important; border: 1px solid #d0d0d0 !important; 
+            padding: 2px 8px !important; border-radius: 4px; font-size: 10px !important; font-weight: bold; cursor: pointer;
+        }
+        .tab.active { background: #e0e0e0 !important; color: #191919 !important; border-color: #bbb !important; }
+        .memo-container { 
+            width: 250px; background-color: #f9f9f9 !important; 
+            border-radius: 8px; padding: 12px; border: 1px solid #d0d0d0; 
+            display: flex; flex-direction: column; position: relative;
+        }
+        textarea { 
+            width: 100%; height: 250px; background: transparent !important; border: none !important; 
+            color: #191919 !important; font-size: 16px !important; line-height: 1.6 !important; 
+            resize: none; outline: none; font-family: inherit !important; 
+        }
+        .link-list {
+            display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px;
+            padding-top: 10px; border-top: 1px solid #e0e0e0;
+            max-height: 60px; overflow-y: auto;
+        }
+        .url-link {
+            display: flex; align-items: center; gap: 4px;
+            background: #f0f0f0; border: 1px solid #d0d0d0; border-radius: 4px;
+            padding: 2px 6px; color: #2383e2; font-size: 10px; text-decoration: none;
+            max-width: 100px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .url-link:hover { background: #e0e0e0; border-color: #2383e2; }
+        .url-link::before { content: '🔗'; font-size: 9px; }
+        .controls { 
+            display: flex; justify-content: space-between; align-items: center; 
+            margin-top: 8px; padding-top: 8px;
+        }
+        .btn-small { 
+            background: #f0f0f0; color: #555; border: 1px solid #d0d0d0; 
+            padding: 2px 6px; border-radius: 4px; font-size: 16px; font-weight: 700; cursor: pointer; 
+        }
+        .btn-page-ctrl { 
+            background: #f0f0f0 !important; color: #555 !important; border: 1px solid #d0d0d0 !important; 
+            border-radius: 4px; width: 28px; height: 28px; cursor: pointer; font-size: 18px !important;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .status { font-size: 9px; color: #aaa; font-family: monospace; font-weight: bold; }
+        .status.syncing { color: #888; }
+        .status.ok { color: #4a9; }
+        .status.err { color: #c55; }
+        .setup-panel {
+            background: #f9f9f9; border: 1px solid #d0d0d0; border-radius: 8px;
+            padding: 12px; width: 250px; display: none; flex-direction: column; gap: 8px;
+        }
+        .setup-panel.visible { display: flex; }
+        .setup-label { font-size: 14px; color: #555; }
+        .setup-input {
+            background: #ffffff; border: 1px solid #ccc; border-radius: 4px;
+            color: #191919; font-size: 16px; padding: 4px 6px; width: 100%; outline: none;
+        }
+        .setup-input:focus { border-color: #2383e2; }
+        .setup-btn {
+            background: #2383e2; color: #fff; border: none; border-radius: 4px;
+            padding: 4px 8px; font-size: 16px; font-weight: bold; cursor: pointer;
+        }
+        .setup-btn:hover { background: #1a6fc4; }
+        .setup-hint { font-size: 12px; color: #999; line-height: 1.4; }
+        .gear-btn {
+            background: #f0f0f0; color: #555; border: 1px solid #d0d0d0;
+            padding: 2px 6px; border-radius: 4px; font-size: 16px; font-weight: 700; cursor: pointer;
+        }
+        .gear-btn:hover { color: #191919; }
+    </style>
+</head>
+<body>
+    <div class="header-wrapper">
+        <div id="tabContainer"></div>
+    </div>
+    <div class="setup-panel" id="setupPanel">
+        <div class="setup-label">GitHub Token (ghp_...)</div>
+        <input class="setup-input" id="tokenInput" type="password" placeholder="ghp_xxxxxxxxxxxx">
+        <div class="setup-label">Gist ID（新規の場合は空欄）</div>
+        <input class="setup-input" id="gistIdInput" type="text" placeholder="自動作成されます">
+        <button class="setup-btn" id="saveSetupBtn">保存して接続</button>
+        <div class="setup-hint">トークンはこのデバイスにのみ保存されます。Gist IDはどのデバイスでも同じものを使用してください。</div>
+        <div id="gistIdDisplay" style="display:none; background:#f0f0f0; border:1px solid #2383e2; border-radius:4px; padding:6px 8px;">
+            <div style="font-size:12px; color:#555; margin-bottom:4px;">✅ Gist ID（他のデバイスにコピーしてください）</div>
+            <div id="gistIdText" style="font-size:12px; color:#2383e2; word-break:break-all; font-family:monospace;"></div>
+        </div>
+    </div>
+    <div class="memo-container" id="memoContainer">
+        <textarea id="memoInput" placeholder="Memo..."></textarea>
+        <div id="linkList" class="link-list"></div>
+        <div class="controls">
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <button id="timeBtn" class="btn-small">TIME</button>
+                <button class="gear-btn" id="gearBtn" title="設定">⚙</button>
+                <div id="saveStatus" class="status">--</div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 4px;">
+                <button id="addBtn" class="btn-page-ctrl">+</button>
+                <button id="deleteBtn" class="btn-page-ctrl">−</button>
+            </div>
+        </div>
+    </div>
+<script>
+    const memoInput = document.getElementById('memoInput');
+    const linkList = document.getElementById('linkList');
+    const tabContainer = document.getElementById('tabContainer');
+    const saveStatus = document.getElementById('saveStatus');
+    const setupPanel = document.getElementById('setupPanel');
+    const tokenInput = document.getElementById('tokenInput');
+    const gistIdInput = document.getElementById('gistIdInput');
+    const LOCAL_KEY = 'memo_gist_config';
+    let config = JSON.parse(localStorage.getItem(LOCAL_KEY) || '{}');
+    let pages = [''];
+    let currentIndex = 0;
+    let saveTimer = null;
+
+    document.getElementById('gearBtn').onclick = () => {
+        const visible = setupPanel.classList.contains('visible');
+        setupPanel.classList.toggle('visible', !visible);
+        if (!visible) {
+            tokenInput.value = config.token || '';
+            gistIdInput.value = config.gistId || '';
+        }
+    };
+
+    document.getElementById('saveSetupBtn').onclick = async () => {
+        const token = tokenInput.value.trim();
+        const gistId = gistIdInput.value.trim();
+        if (!token) { alert('トークンを入力してください'); return; }
+        config.token = token;
+        config.gistId = gistId || null;
+        localStorage.setItem(LOCAL_KEY, JSON.stringify(config));
+        setupPanel.classList.remove('visible');
+        await initGist();
+    };
+
+    async function initGist() {
+        if (!config.token) { setStatus('設定', ''); return; }
+        setStatus('接続中...', 'syncing');
+        if (!config.gistId) { await createGist(); } else { await loadFromGist(); }
+    }
+
+    async function createGist() {
+        try {
+            const res = await fetch('https://api.github.com/gists', {
+                method: 'POST',
+                headers: { 'Authorization': `token ${config.token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ description: 'Memo Widget Data', public: false, files: { 'memo-data.json': { content: JSON.stringify(['']) } } })
+            });
+            const data = await res.json();
+            config.gistId = data.id;
+            localStorage.setItem(LOCAL_KEY, JSON.stringify(config));
+            gistIdInput.value = data.id;
+            document.getElementById('gistIdText').textContent = data.id;
+            document.getElementById('gistIdDisplay').style.display = 'block';
+            document.getElementById('gearBtn').click();
+            pages = ['']; currentIndex = 0; memoInput.value = '';
+            renderTabs(); updateLinks(); setStatus('OK', 'ok');
+        } catch(e) { setStatus('ERR', 'err'); }
+    }
+
+    async function loadFromGist() {
+        try {
+            const res = await fetch(`https://api.github.com/gists/${config.gistId}`, {
+                headers: { 'Authorization': `token ${config.token}` }
+            });
+            const data = await res.json();
+            pages = JSON.parse(data.files['memo-data.json'].content);
+            if (!Array.isArray(pages) || pages.length === 0) pages = [''];
+            currentIndex = Math.min(currentIndex, pages.length - 1);
+            memoInput.value = pages[currentIndex];
+            renderTabs(); updateLinks(); setStatus('OK', 'ok');
+        } catch(e) { setStatus('ERR', 'err'); }
+    }
+
+    async function saveToGist() {
+        if (!config.token || !config.gistId) { setStatus('local', ''); return; }
+        setStatus('sync...', 'syncing');
+        try {
+            await fetch(`https://api.github.com/gists/${config.gistId}`, {
+                method: 'PATCH',
+                headers: { 'Authorization': `token ${config.token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ files: { 'memo-data.json': { content: JSON.stringify(pages) } } })
+            });
+            setStatus('OK', 'ok');
+        } catch(e) { setStatus('ERR', 'err'); }
+    }
+
+    function setStatus(text, cls) {
+        saveStatus.textContent = text;
+        saveStatus.className = 'status' + (cls ? ' ' + cls : '');
+    }
+
+    function renderTabs() {
+        tabContainer.innerHTML = '';
+        pages.forEach((_, idx) => {
+            const btn = document.createElement('button');
+            btn.className = `tab ${idx === currentIndex ? 'active' : ''}`;
+            btn.textContent = idx + 1;
+            btn.onclick = () => switchPage(idx);
+            tabContainer.appendChild(btn);
+        });
+    }
+
+    function updateLinks() {
+        const text = memoInput.value;
+        const matches = text.match(/(https?:\/\/[^\s]+)/g) || [];
+        linkList.innerHTML = '';
+        [...new Set(matches)].forEach(url => {
+            const a = document.createElement('a');
+            a.href = url; a.target = '_blank'; a.className = 'url-link';
+            a.textContent = url.split('/').pop() || url.replace('https://', '');
+            linkList.appendChild(a);
+        });
+    }
+
+    function switchPage(idx) {
+        pages[currentIndex] = memoInput.value;
+        currentIndex = idx;
+        memoInput.value = pages[currentIndex];
+        updateLinks(); renderTabs();
+    }
+
+    memoInput.oninput = () => {
+        pages[currentIndex] = memoInput.value;
+        updateLinks(); setStatus('...', '');
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(saveToGist, 1500);
+    };
+
+    document.getElementById('timeBtn').onclick = () => {
+        const now = new Date();
+        const stamp = `[${now.getMonth()+1}/${now.getDate()} ${now.getHours()}:${now.getMinutes().toString().padStart(2,'0')}] `;
+        const start = memoInput.selectionStart;
+        memoInput.value = memoInput.value.substring(0, start) + stamp + memoInput.value.substring(memoInput.selectionEnd);
+        pages[currentIndex] = memoInput.value;
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(saveToGist, 1500);
+    };
+
+    document.getElementById('addBtn').onclick = async () => {
+        if (pages.length >= 7) return;
+        pages[currentIndex] = memoInput.value;
+        pages.push(''); currentIndex = pages.length - 1;
+        memoInput.value = ''; updateLinks(); renderTabs();
+        await saveToGist();
+    };
+
+    document.getElementById('deleteBtn').onclick = async () => {
+        if (pages.length <= 1) return;
+        pages.splice(currentIndex, 1);
+        currentIndex = Math.max(0, currentIndex - 1);
+        memoInput.value = pages[currentIndex];
+        updateLinks(); renderTabs(); await saveToGist();
+    };
+
+    initGist();
+</script>
+</body>
+</html>
